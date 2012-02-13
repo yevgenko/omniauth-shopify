@@ -4,7 +4,7 @@ require "omniauth-shopify/version"
 
 Gem::Specification.new do |s|
   s.name        = "omniauth-shopify"
-  s.version     = Omniauth::Shopify::VERSION
+  s.version     = OmniAuth::Shopify::VERSION
   s.authors     = ["Yevgeniy A. Viktorov"]
   s.email       = ["craftsman@yevgenko.me"]
   s.homepage    = ""
