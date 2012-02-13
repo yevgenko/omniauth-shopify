@@ -19,4 +19,8 @@ Gem::Specification.new do |s|
   s.require_paths = ["lib"]
 
   s.add_runtime_dependency 'omniauth', '~> 1.0'
+
+  s.add_development_dependency 'minitest' if RUBY_VERSION < '1.9.2'
+  s.add_development_dependency 'rack-test'
+  s.add_development_dependency 'rake'
 end
