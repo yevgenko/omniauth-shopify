@@ -2,6 +2,8 @@
 
 Strategy for authenticating to Shopify API using OmniAuth.
 
+[![Build Status](https://secure.travis-ci.org/yevgenko/omniauth-shopify.png)](http://travis-ci.org/yevgenko/omniauth-shopify)
+
 ## Installation
 
 Add this line to your application's Gemfile:
