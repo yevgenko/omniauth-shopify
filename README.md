@@ -33,8 +33,9 @@ The following information is provided back to you for this provider:
     name: 'example.myshopify.com',
     urls: { site: 'https://some-store.myshopify.com/admin' }
   },
-  credentials: {
-    token: 'thetoken' # can be used to auth to the API
+  credentials: { # basic auth
+    username: 'api_key',
+    password: 'password'
   }
 }
 ```

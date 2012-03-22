@@ -65,7 +65,10 @@ module OmniAuth
         :name => identifier,
         :urls => {:site => "https://#{identifier}.myshopify.com/admin"}
       } }
-      credentials{ {:token => self.token} }
+      credentials{ { # basic auth
+        :username => options.api_key,
+        :password => Digest::MD5.hexdigest(options.secret + self.token)
+      } }
     end
   end
 end

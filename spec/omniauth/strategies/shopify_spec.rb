@@ -41,6 +41,10 @@ describe OmniAuth::Strategies::Shopify do
     Digest::MD5.hexdigest('hush' + calculated_signature.sort.join)
   end
 
+  def password
+    Digest::MD5.hexdigest('hush' + query_parameters['t'])
+  end
+
   describe '#request_phase' do
     it 'must prompt for a shop url' do
       get '/auth/shopify'
@@ -67,12 +71,16 @@ describe OmniAuth::Strategies::Shopify do
       last_request.env['omniauth.auth']['uid'].must_equal 'some-shop'
     end
 
-    it 'must have token' do
-      last_request.env['omniauth.auth']['credentials']['token'].must_equal query_parameters['t']
-    end
-
     it 'must have site URL' do
       last_request.env['omniauth.auth']['info']['urls']['site'].must_equal "https://some-shop.myshopify.com/admin"
+    end
+
+    it 'must have username' do
+      last_request.env['omniauth.auth']['credentials']['username'].must_equal 'apikey'
+    end
+
+    it 'must have password' do
+      last_request.env['omniauth.auth']['credentials']['password'].must_equal password
     end
   end
 
