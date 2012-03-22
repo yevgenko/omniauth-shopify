@@ -64,11 +64,15 @@ describe OmniAuth::Strategies::Shopify do
     end
 
     it 'must have proper uid' do
-      last_request.env['omniauth.auth']['uid'].must_equal query_parameters['shop']
+      last_request.env['omniauth.auth']['uid'].must_equal 'some-shop'
     end
 
     it 'must have token' do
       last_request.env['omniauth.auth']['credentials']['token'].must_equal query_parameters['t']
+    end
+
+    it 'must have site URL' do
+      last_request.env['omniauth.auth']['info']['urls']['site'].must_equal "https://some-shop.myshopify.com/admin"
     end
   end
 

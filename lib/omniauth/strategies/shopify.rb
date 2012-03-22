@@ -17,6 +17,10 @@ module OmniAuth
       def identifier
         i = options.identifier || request.params[options.identifier_param.to_s]
         i = nil if i == ''
+        if i
+          i.gsub!(/https?:\/\//, '') # remove http:// or https://
+          i.gsub!(/\..*/, '') # remove .myshopify.com
+        end
         i
       end
 
@@ -28,11 +32,7 @@ module OmniAuth
       end
 
       def create_permission_url
-        url = identifier
-        url.gsub!(/https?:\/\//, '')                            # remove http:// or https://
-        url.concat(".myshopify.com") unless url.include?('.')   # extend url to myshopify.com if no host is given
-
-        "http://#{url}/admin/api/auth?api_key=#{options[:api_key]}"
+        "http://#{identifier}.myshopify.com/admin/api/auth?api_key=#{options[:api_key]}"
       end
 
       def start
@@ -60,8 +60,11 @@ module OmniAuth
         super
       end
 
-      uid{ request.params[options.identifier_param.to_s] }
-      info{ {:name => request.params[options.identifier_param.to_s]} }
+      uid{ identifier }
+      info{ {
+        :name => identifier,
+        :urls => {:site => "https://#{identifier}.myshopify.com/admin"}
+      } }
       credentials{ {:token => self.token} }
     end
   end
