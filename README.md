@@ -40,6 +40,17 @@ The following information is provided back to you for this provider:
 }
 ```
 
+## Examples
+
+[examples/][] directory contains few simple [sinatra][] apps:
+
+* auth_hash.rb - displays auth hash schema
+* api_consumer.rb - consuming api with [httparty][]
+
+So, make sure you have [sinatra][] and [httparty][] gems and run it as follow:
+
+    SHOPIFY_KEY="apikey" SHOPIFY_SECRET="secret" ruby auth_hash.rb
+
 ## Contributing
 
 1. Fork it
@@ -47,3 +58,8 @@ The following information is provided back to you for this provider:
 3. Commit your changes (`git commit -am 'Added some feature'`)
 4. Push to the branch (`git push origin my-new-feature`)
 5. Create new Pull Request
+
+
+[examples/]:https://github.com/yevgenko/omniauth-shopify/tree/master/examples
+[sinatra]:http://www.sinatrarb.com/
+[httparty]:https://github.com/jnunemaker/httparty
