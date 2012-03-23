@@ -28,9 +28,9 @@ The following information is provided back to you for this provider:
 
 ```ruby
 {
-  uid: 'example.myshopify.com',
+  uid: 'some-store',
   info: {
-    name: 'example.myshopify.com',
+    name: 'some-store',
     urls: { site: 'https://some-store.myshopify.com/admin' }
   },
   credentials: { # basic auth
