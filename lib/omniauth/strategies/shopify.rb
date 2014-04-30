@@ -5,7 +5,7 @@ module OmniAuth
     class Shopify
       include OmniAuth::Strategy
 
-      args [:api_key, :secret]
+      args [:api_key, :secret, :scopes]
 
       option :api_key, nil
       option :secret, nil
@@ -25,14 +25,14 @@ module OmniAuth
       end
 
       def get_identifier
-        f = OmniAuth::Form.new(:title => 'Shopify Authentication')
-        f.label_field('The URL of the Shop', options.identifier_param)
+        f = OmniAuth::Form.new(:title => 'Connect your Shopify Shop')
+        f.label_field('Your Shop URL', options.identifier_param)
         f.input_field('url', options.identifier_param)
         f.to_response
       end
 
       def create_permission_url
-        "http://#{identifier}.myshopify.com/admin/api/auth?api_key=#{options[:api_key]}"
+        "http://#{identifier}.myshopify.com/admin/oauth/authorize?client_id=#{options[:api_key]}&scope=#{options[:scopes].join(',')}"
       end
 
       def start
@@ -56,7 +56,7 @@ module OmniAuth
       def callback_phase
         params = request.params
         return fail!(:invalid_response) unless validate_signature(params) && params['timestamp'].to_i > (Time.now - 24 * 3600).utc.to_i
-        self.token = params['t']
+        self.token = params['code']
         super
       end
 
