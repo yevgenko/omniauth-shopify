@@ -1,6 +1,7 @@
 ENV['RACK_ENV'] = 'test'
 require 'minitest/autorun'
 require 'rack/test'
+require 'faraday'
 
 require 'omniauth-shopify'
 require 'digest/md5'
@@ -11,7 +12,7 @@ describe OmniAuth::Strategies::Shopify do
   def app
     Rack::Builder.new {
       use Rack::Session::Cookie
-      use OmniAuth::Strategies::Shopify, 'apikey', 'hush'
+      use OmniAuth::Strategies::Shopify, 'apikey', 'hush', ['get_product']
       run lambda {|env| [404, {'Content-Type' => 'text/plain'}, [nil || env.key?('omniauth.auth').to_s]] }
     }.to_app
   end
@@ -19,7 +20,8 @@ describe OmniAuth::Strategies::Shopify do
   def query_parameters
     {
       "shop" => "some-shop.myshopify.com",
-      "t" => "a94a110d86d2452eb3e2af4cfb8a3828"
+      "code" => "a94a110d86d2452eb3e2af4cfb8a3828",
+      "scope" => "get_product"
     }
   end
 
@@ -42,7 +44,7 @@ describe OmniAuth::Strategies::Shopify do
   end
 
   def password
-    Digest::MD5.hexdigest('hush' + query_parameters['t'])
+    Digest::MD5.hexdigest('hush' + query_parameters['code'])
   end
 
   describe '#request_phase' do
@@ -54,7 +56,7 @@ describe OmniAuth::Strategies::Shopify do
     it 'must redirect to authentication url' do
       post '/auth/shopify', :shop => 'some-shop'
       assert last_response.redirect?
-      last_response.headers['Location'].must_equal 'http://some-shop.myshopify.com/admin/api/auth?api_key=apikey'
+      last_response.headers['Location'].must_equal "http://some-shop.myshopify.com/admin/oauth/authorize?client_id=apikey&scope=get_product"
     end
   end
 

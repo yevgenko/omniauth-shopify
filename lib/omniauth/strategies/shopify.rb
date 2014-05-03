@@ -31,12 +31,20 @@ module OmniAuth
         f.to_response
       end
 
-      def create_permission_url
-        "http://#{identifier}.myshopify.com/admin/oauth/authorize?client_id=#{options[:api_key]}&scope=#{options[:scopes].join(',')}"
+      def base_url
+        "https://#{identifier}.myshopify.com"
+      end
+
+      def permission_url
+        base_url + "/admin/oauth/authorize?client_id=#{options[:api_key]}&scope=#{options[:scopes].join(',')}"
+      end
+
+      def token_url
+        base_url + '/admin/oauth/access_token'
       end
 
       def start
-        redirect create_permission_url
+        redirect permission_url
       end
 
       def validate_signature(params)
@@ -56,18 +64,34 @@ module OmniAuth
       def callback_phase
         params = request.params
         return fail!(:invalid_response) unless validate_signature(params) && params['timestamp'].to_i > (Time.now - 24 * 3600).utc.to_i
-        self.token = params['code']
+
+        self.token = get_token(params['code'])
         super
+      end
+
+      def get_token(code)
+        params = { 
+          :client_id     => options[:api_key], 
+          :client_secret => options[:secret], 
+          :code          => code 
+        }
+
+        response = Faraday.post(token_url, params)
+
+        if response.status == 200
+          token = JSON.parse(response.body)['access_token']
+        else
+          raise RuntimeError, response.body
+        end
       end
 
       uid{ identifier }
       info{ {
         :name => identifier,
-        :urls => {:site => "https://#{identifier}.myshopify.com/admin"}
+        :urls => {:site => base_url}
       } }
       credentials{ { # basic auth
-        :username => options.api_key,
-        :password => Digest::MD5.hexdigest(options.secret + self.token)
+        :token => self.token
       } }
     end
   end
