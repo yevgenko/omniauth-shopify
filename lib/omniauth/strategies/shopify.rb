@@ -5,7 +5,7 @@ module OmniAuth
     class Shopify
       include OmniAuth::Strategy
 
-      args [:api_key, :secret, :scopes]
+      args [:api_key, :secret, :scopes, :redirect_uri]
 
       option :api_key, nil
       option :secret, nil
@@ -35,8 +35,12 @@ module OmniAuth
         "https://#{identifier}.myshopify.com"
       end
 
+      def redirect_uri
+        options[:redirect_uri] || request.base_url + request.path + '/callback'
+      end
+
       def permission_url
-        base_url + "/admin/oauth/authorize?client_id=#{options[:api_key]}&scope=#{options[:scopes].join(',')}"
+        base_url + "/admin/oauth/authorize?client_id=#{options[:api_key]}&scope=#{options[:scopes].join(',')}&redirect_uri=#{redirect_uri}"
       end
 
       def token_url
@@ -70,10 +74,10 @@ module OmniAuth
       end
 
       def get_token(code)
-        params = { 
-          :client_id     => options[:api_key], 
-          :client_secret => options[:secret], 
-          :code          => code 
+        params = {
+          :client_id     => options[:api_key],
+          :client_secret => options[:secret],
+          :code          => code
         }
 
         response = Faraday.post(token_url, params)
