@@ -1,102 +1,100 @@
-require 'omniauth'
+require 'omniauth/strategies/oauth2'
 
 module OmniAuth
   module Strategies
-    class Shopify
-      include OmniAuth::Strategy
+    class Shopify < OmniAuth::Strategies::OAuth2
+      # Available scopes: content themes products customers orders script_tags shipping
+      # read_*  or write_*
+      DEFAULT_SCOPE = 'read_products'
+      SCOPE_DELIMITER = ','
+      MINUTE = 60
+      CODE_EXPIRES_AFTER = 10 * MINUTE
 
-      args [:api_key, :secret, :scopes, :redirect_uri]
+      option :client_options, {
+        :authorize_url => '/admin/oauth/authorize',
+        :token_url => '/admin/oauth/access_token'
+      }
 
-      option :api_key, nil
-      option :secret, nil
-      option :identifier, nil
-      option :identifier_param, 'shop'
+      option :callback_url
+      option :myshopify_domain, 'myshopify.com'
 
-      attr_accessor :token
+      # When `true`, the authorization phase will fail if the granted scopes
+      # mismatch the requested scopes.
+      option :validate_granted_scopes, true
 
-      def identifier
-        i = options.identifier || request.params[options.identifier_param.to_s]
-        i = nil if i == ''
-        if i
-          i.gsub!(/https?:\/\//, '') # remove http:// or https://
-          i.gsub!(/\..*/, '') # remove .myshopify.com
-        end
-        i
+      def shop
+        request.params['shop']
       end
 
-      def get_identifier
-        f = OmniAuth::Form.new(:title => 'Connect your Shopify Shop')
-        f.label_field('Your Shop URL', options.identifier_param)
-        f.input_field('url', options.identifier_param)
-        f.to_response
+      uid { shop.gsub('.myshopify.com','') }
+
+      def valid_signature?
+        return false unless request.POST.empty?
+
+        params = request.GET
+        signature = params['hmac']
+        timestamp = params['timestamp']
+        return false unless signature && timestamp
+
+        return false unless timestamp.to_i > Time.now.to_i - CODE_EXPIRES_AFTER
+
+        calculated_signature = self.class.hmac_sign(self.class.encoded_params_for_signature(params), options.client_secret)
+        Rack::Utils.secure_compare(calculated_signature, signature)
       end
 
-      def base_url
-        "https://#{identifier}.myshopify.com"
+      def valid_scope?(token)
+        params = options.authorize_params.merge(options_for("authorize"))
+        return false unless token && params[:scope] && token['scope']
+        expected_scope = normalized_scopes(params[:scope]).sort
+        (expected_scope == token['scope'].split(SCOPE_DELIMITER).sort)
       end
 
-      def redirect_uri
-        options[:redirect_uri] || request.base_url + request.path + '/callback'
+      def normalized_scopes(scopes)
+        scope_list = scopes.to_s.split(SCOPE_DELIMITER).map(&:strip).reject(&:empty?).uniq
+        ignore_scopes = scope_list.map { |scope| scope =~ /\Awrite_(.*)\z/ && "read_#{$1}" }.compact
+        scope_list - ignore_scopes
       end
 
-      def permission_url
-        base_url + "/admin/oauth/authorize?client_id=#{options[:api_key]}&scope=#{options[:scopes].join(',')}&redirect_uri=#{redirect_uri}"
+      def self.encoded_params_for_signature(params)
+        params = params.dup
+        params.delete('hmac')
+        params.delete('signature') # deprecated signature
+        params.map{|k,v| "#{URI.escape(k.to_s, '&=%')}=#{URI.escape(v.to_s, '&%')}"}.sort.join('&')
       end
 
-      def token_url
-        base_url + '/admin/oauth/access_token'
+      def self.hmac_sign(encoded_params, secret)
+        OpenSSL::HMAC.hexdigest(OpenSSL::Digest::SHA256.new, secret, encoded_params)
       end
-
-      def start
-        redirect permission_url
-      end
-
-      def validate_signature(params)
-        signature = params.delete('signature')
-        sorted_params = params.collect{|k,v|"#{k}=#{v}"}.sort.join
-        Digest::MD5.hexdigest(options.secret + sorted_params) == signature
-      end
-
-      ##
-      # Authentication Lifecycle
-      ##
 
       def request_phase
-        identifier ? start : get_identifier
-      end
-
-      def callback_phase
-        params = request.params
-        return fail!(:invalid_response) unless validate_signature(params) && params['timestamp'].to_i > (Time.now - 24 * 3600).utc.to_i
-
-        self.token = get_token(params['code'])
+        env['omniauth.strategy'].options[:client_options][:site] = "https://#{shop}"
         super
       end
 
-      def get_token(code)
-        params = {
-          :client_id     => options[:api_key],
-          :client_secret => options[:secret],
-          :code          => code
-        }
+      def callback_phase
+        return fail!(:invalid_signature, CallbackError.new(:invalid_signature, "Signature does not match, it may have been tampered with.")) unless valid_signature?
 
-        response = Faraday.post(token_url, params)
+        token = build_access_token
+        unless valid_scope?(token)
+          return fail!(:invalid_scope, CallbackError.new(:invalid_scope, "Scope does not match, it may have been tampered with."))
+        end
 
-        if response.status == 200
-          token = JSON.parse(response.body)['access_token']
-        else
-          raise RuntimeError, response.body
+        super
+      end
+
+      def build_access_token
+        @built_access_token ||= super
+      end
+
+      def authorize_params
+        super.tap do |params|
+          params[:scope] = normalized_scopes(params[:scope] || DEFAULT_SCOPE).join(SCOPE_DELIMITER)
         end
       end
 
-      uid{ identifier }
-      info{ {
-        :name => identifier,
-        :urls => {:site => base_url}
-      } }
-      credentials{ { # basic auth
-        :token => self.token
-      } }
+      def callback_url
+        options[:callback_url] || full_host + script_name + callback_path
+      end
     end
   end
 end
