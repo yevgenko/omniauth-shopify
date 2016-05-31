@@ -5,7 +5,7 @@ module OmniAuth
     class Shopify
       include OmniAuth::Strategy
 
-      args [:api_key, :secret]
+      args [:api_key, :secret, :scopes, :redirect_uri]
 
       option :api_key, nil
       option :secret, nil
@@ -25,18 +25,30 @@ module OmniAuth
       end
 
       def get_identifier
-        f = OmniAuth::Form.new(:title => 'Shopify Authentication')
-        f.label_field('The URL of the Shop', options.identifier_param)
+        f = OmniAuth::Form.new(:title => 'Connect your Shopify Shop')
+        f.label_field('Your Shop URL', options.identifier_param)
         f.input_field('url', options.identifier_param)
         f.to_response
       end
 
-      def create_permission_url
-        "http://#{identifier}.myshopify.com/admin/api/auth?api_key=#{options[:api_key]}"
+      def base_url
+        "https://#{identifier}.myshopify.com"
+      end
+
+      def redirect_uri
+        options[:redirect_uri] || request.base_url + request.path + '/callback'
+      end
+
+      def permission_url
+        base_url + "/admin/oauth/authorize?client_id=#{options[:api_key]}&scope=#{options[:scopes].join(',')}&redirect_uri=#{redirect_uri}"
+      end
+
+      def token_url
+        base_url + '/admin/oauth/access_token'
       end
 
       def start
-        redirect create_permission_url
+        redirect permission_url
       end
 
       def validate_signature(params)
@@ -56,18 +68,34 @@ module OmniAuth
       def callback_phase
         params = request.params
         return fail!(:invalid_response) unless validate_signature(params) && params['timestamp'].to_i > (Time.now - 24 * 3600).utc.to_i
-        self.token = params['t']
+
+        self.token = get_token(params['code'])
         super
+      end
+
+      def get_token(code)
+        params = {
+          :client_id     => options[:api_key],
+          :client_secret => options[:secret],
+          :code          => code
+        }
+
+        response = Faraday.post(token_url, params)
+
+        if response.status == 200
+          token = JSON.parse(response.body)['access_token']
+        else
+          raise RuntimeError, response.body
+        end
       end
 
       uid{ identifier }
       info{ {
         :name => identifier,
-        :urls => {:site => "https://#{identifier}.myshopify.com/admin"}
+        :urls => {:site => base_url}
       } }
       credentials{ { # basic auth
-        :username => options.api_key,
-        :password => Digest::MD5.hexdigest(options.secret + self.token)
+        :token => self.token
       } }
     end
   end
